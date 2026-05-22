@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useState } from 'react'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import ProjectDetail from './pages/ProjectDetail'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -11,6 +12,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login onLogin={setUser} />} />
         <Route path="/dashboard" element={user ? <Dashboard user={user} onLogout={() => setUser(null)} /> : <Navigate to="/login" />} />
+        <Route path="/project/:id" element={user ? <ProjectDetail user={user} onLogout={() => setUser(null)} /> : <Navigate to="/login" />} />
         <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
       </Routes>
     </BrowserRouter>

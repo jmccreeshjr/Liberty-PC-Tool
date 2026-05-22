@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 const PHASES = [
   { num: 1, name: 'Business Development', color: '#64748b' },
@@ -68,6 +69,7 @@ const FILTERS = ['All', 'On Track', 'At Risk', 'Overdue', 'Phase 1–3', 'Phase 
 
 export default function Dashboard({ user, onLogout }) {
   const [filter, setFilter] = useState('All')
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
 
   const filtered = MOCK_PROJECTS.filter(p => {
@@ -181,7 +183,7 @@ export default function Dashboard({ user, onLogout }) {
           const pmColor = PM_COLORS[project.pm] || '#64748b'
 
           return (
-            <div key={project.id} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
+            <div key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
 
               {/* Card Header */}
               <div className="px-5 pt-4 pb-3 flex items-start justify-between">
