@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { getProject } from '../api'
 
 const PHASES = [
   { num: 1, name: 'Business Development', color: '#64748b' },
@@ -87,18 +89,21 @@ const SOP_TASKS = {
 }
 
 const MOCK_PROJECTS = [
-  { id: 1, number: '25-0142', name: 'Penn Medicine Cardiac Wing', customer: 'Turner Construction', pm: "Jim O'Driscoll", sector: 'Healthcare', phase: 5, status: 'on-track', contractValue: '$2,450,000', daysInPhase: 23, billingPct: 45, sopComplete: 78, union: 'Local 98', startDate: 'Mar 3, 2025', completionDate: 'Nov 14, 2025', openActionItems: 3, openRFIs: 2, openCOs: 1 },
-  { id: 2, number: '25-0187', name: 'Temple University STEM Building', customer: 'Gilbane Building Co.', pm: 'Damion Covelens', sector: 'Education', phase: 3, status: 'at-risk', contractValue: '$1,820,000', daysInPhase: 8, billingPct: 0, sopComplete: 55, union: 'Local 98', startDate: 'Jun 1, 2025', completionDate: 'Feb 28, 2026', openActionItems: 7, openRFIs: 0, openCOs: 0 },
-  { id: 3, number: '25-0093', name: 'Reading Terminal Market Renovation', customer: 'Reading Terminal Authority', pm: 'Ray Reichenbach', sector: 'Commercial', phase: 7, status: 'overdue', contractValue: '$890,000', daysInPhase: 41, billingPct: 82, sopComplete: 91, union: 'Local 98', startDate: 'Oct 14, 2024', completionDate: 'Jun 30, 2025', openActionItems: 5, openRFIs: 4, openCOs: 2 },
-  { id: 4, number: '26-0011', name: 'Amazon Data Center — Phase 2', customer: 'Amazon Web Services', pm: 'Brian Fischer', sector: 'Data Center', phase: 2, status: 'on-track', contractValue: '$4,100,000', daysInPhase: 5, billingPct: 0, sopComplete: 30, union: 'Local 654', startDate: 'TBD', completionDate: 'TBD', openActionItems: 2, openRFIs: 0, openCOs: 0 },
-  { id: 5, number: '25-0201', name: 'Philadelphia Gov Center Electrical Upgrade', customer: 'City of Philadelphia', pm: "Jim O'Driscoll", sector: 'Government', phase: 4, status: 'on-track', contractValue: '$3,250,000', daysInPhase: 14, billingPct: 12, sopComplete: 62, union: 'Local 98', startDate: 'Jul 7, 2025', completionDate: 'Mar 31, 2026', openActionItems: 4, openRFIs: 1, openCOs: 0 },
-  { id: 6, number: '25-0155', name: 'Rhoads Navy Yard Industrial', customer: 'Rhoads Industries', pm: 'Damion Covelens', sector: 'Industrial', phase: 8, status: 'on-track', contractValue: '$680,000', daysInPhase: 12, billingPct: 95, sopComplete: 88, union: 'Local 126', startDate: 'Aug 19, 2024', completionDate: 'May 30, 2025', openActionItems: 1, openRFIs: 0, openCOs: 0 },
+  { id: '1', number: '25-0142', name: 'Penn Medicine Cardiac Wing', customer: 'Turner Construction', pm: "Jim O'Driscoll", sector: 'Healthcare', phase: 5, status: 'on-track', contractValue: '$2,450,000', daysInPhase: 23, billingPct: 45, sopComplete: 78, union: 'Local 98', startDate: 'Mar 3, 2025', completionDate: 'Nov 14, 2025', openActionItems: 3, openRFIs: 2, openCOs: 1 },
+  { id: '2', number: '25-0187', name: 'Temple University STEM Building', customer: 'Gilbane Building Co.', pm: 'Damion Covelens', sector: 'Education', phase: 3, status: 'at-risk', contractValue: '$1,820,000', daysInPhase: 8, billingPct: 0, sopComplete: 55, union: 'Local 98', startDate: 'Jun 1, 2025', completionDate: 'Feb 28, 2026', openActionItems: 7, openRFIs: 0, openCOs: 0 },
+  { id: '3', number: '25-0093', name: 'Reading Terminal Market Renovation', customer: 'Reading Terminal Authority', pm: 'Ray Reichenbach', sector: 'Commercial', phase: 7, status: 'overdue', contractValue: '$890,000', daysInPhase: 41, billingPct: 82, sopComplete: 91, union: 'Local 98', startDate: 'Oct 14, 2024', completionDate: 'Jun 30, 2025', openActionItems: 5, openRFIs: 4, openCOs: 2 },
+  { id: '4', number: '26-0011', name: 'Amazon Data Center — Phase 2', customer: 'Amazon Web Services', pm: 'Brian Fischer', sector: 'Data Center', phase: 2, status: 'on-track', contractValue: '$4,100,000', daysInPhase: 5, billingPct: 0, sopComplete: 30, union: 'Local 654', startDate: 'TBD', completionDate: 'TBD', openActionItems: 2, openRFIs: 0, openCOs: 0 },
+  { id: '5', number: '25-0201', name: 'Philadelphia Gov Center Electrical Upgrade', customer: 'City of Philadelphia', pm: "Jim O'Driscoll", sector: 'Government', phase: 4, status: 'on-track', contractValue: '$3,250,000', daysInPhase: 14, billingPct: 12, sopComplete: 62, union: 'Local 98', startDate: 'Jul 7, 2025', completionDate: 'Mar 31, 2026', openActionItems: 4, openRFIs: 1, openCOs: 0 },
+  { id: '6', number: '25-0155', name: 'Rhoads Navy Yard Industrial', customer: 'Rhoads Industries', pm: 'Damion Covelens', sector: 'Industrial', phase: 8, status: 'on-track', contractValue: '$680,000', daysInPhase: 12, billingPct: 95, sopComplete: 88, union: 'Local 126', startDate: 'Aug 19, 2024', completionDate: 'May 30, 2025', openActionItems: 1, openRFIs: 0, openCOs: 0 },
 ]
 
 const STATUS_CONFIG = {
-  'on-track': { label: 'On Track', bg: '#dcfce7', text: '#16a34a', dot: '#16a34a' },
-  'at-risk':  { label: 'At Risk',  bg: '#fef9c3', text: '#ca8a04', dot: '#ca8a04' },
-  'overdue':  { label: 'Overdue',  bg: '#fee2e2', text: '#dc2626', dot: '#dc2626' },
+  'on-track':  { label: 'On Track', bg: '#dcfce7', text: '#16a34a', dot: '#16a34a' },
+  'On Track':  { label: 'On Track', bg: '#dcfce7', text: '#16a34a', dot: '#16a34a' },
+  'at-risk':   { label: 'At Risk',  bg: '#fef9c3', text: '#ca8a04', dot: '#ca8a04' },
+  'At Risk':   { label: 'At Risk',  bg: '#fef9c3', text: '#ca8a04', dot: '#ca8a04' },
+  'overdue':   { label: 'Overdue',  bg: '#fee2e2', text: '#dc2626', dot: '#dc2626' },
+  'Overdue':   { label: 'Overdue',  bg: '#fee2e2', text: '#dc2626', dot: '#dc2626' },
 }
 
 const ROLE_COLORS = {
@@ -114,10 +119,68 @@ const ROLE_COLORS = {
   'Lead Estimator':{ bg: '#fef9c3', text: '#ca8a04' },
 }
 
+// Normalize a project coming from MongoDB to match the shape the UI expects
+function normalizeApiProject(p) {
+  return {
+    id: p._id,
+    number: p.number || '',
+    name: p.name || '',
+    customer: p.customer || '',
+    pm: p.pm || '',
+    sector: p.sector || '',
+    phase: p.phase || 1,
+    status: p.status || 'on-track',
+    contractValue: p.contractValue != null ? `$${Number(p.contractValue).toLocaleString()}` : 'TBD',
+    daysInPhase: p.daysInPhase || 0,
+    billingPct: p.billingPercent ?? p.billingPct ?? 0,
+    sopComplete: p.sopComplete || 0,
+    union: p.union || '',
+    startDate: p.startDate || 'TBD',
+    completionDate: p.completionDate || 'TBD',
+    openActionItems: p.openItems ?? p.openActionItems ?? 0,
+    openRFIs: p.openRFIs || 0,
+    openCOs: p.openCOs || 0,
+  }
+}
+
 export default function ProjectDetail({ user, onLogout }) {
   const { id } = useParams()
   const navigate = useNavigate()
-  const project = MOCK_PROJECTS.find(p => p.id === parseInt(id))
+  const [project, setProject] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [source, setSource] = useState(null) // 'api' | 'mock'
+
+  useEffect(() => {
+    // First try the real API
+    getProject(id)
+      .then(data => {
+        if (data && data._id) {
+          setProject(normalizeApiProject(data))
+          setSource('api')
+        } else {
+          // API returned nothing — fall back to mock data
+          const mock = MOCK_PROJECTS.find(p => p.id === id || p.id === String(id))
+          setProject(mock || null)
+          setSource('mock')
+        }
+      })
+      .catch(() => {
+        // API error (e.g. Render sleeping) — fall back to mock data
+        const mock = MOCK_PROJECTS.find(p => p.id === id || p.id === String(id))
+        setProject(mock || null)
+        setSource('mock')
+      })
+      .finally(() => setLoading(false))
+  }, [id])
+
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f2f5' }}>
+      <div style={{ textAlign: 'center', color: '#6b7280' }}>
+        <div style={{ fontSize: '32px', marginBottom: '12px' }}>⚡</div>
+        <p style={{ fontSize: '15px' }}>Loading project...</p>
+      </div>
+    </div>
+  )
 
   if (!project) return (
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#f0f2f5' }}>
@@ -129,7 +192,7 @@ export default function ProjectDetail({ user, onLogout }) {
   )
 
   const phase = PHASES[project.phase - 1]
-  const status = STATUS_CONFIG[project.status]
+  const status = STATUS_CONFIG[project.status] || STATUS_CONFIG['on-track']
   const tasks = SOP_TASKS[project.phase] || []
   const doneTasks = tasks.filter(t => t.done).length
 
@@ -156,6 +219,11 @@ export default function ProjectDetail({ user, onLogout }) {
           <span className="text-white font-semibold text-sm">{project.number} — {project.name}</span>
         </div>
         <div className="flex items-center gap-4">
+          {source === 'mock' && (
+            <span style={{ backgroundColor: '#f59e0b', color: 'white', fontSize: '11px', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+              DEMO DATA
+            </span>
+          )}
           <span className="text-blue-200 text-sm">{user.name}</span>
           <button onClick={onLogout} className="bg-white text-sm font-medium px-4 py-1.5 rounded-full" style={{ color: '#1a2b4a' }}>Sign Out</button>
         </div>
