@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getProject } from '../api'
+import EditProjectPanel from '../components/EditProjectPanel'
 
 const PHASES = [
   { num: 1, name: 'Business Development', color: '#64748b' },
@@ -159,8 +160,10 @@ export default function ProjectDetail({ user, onLogout }) {
   const [project, setProject] = useState(null)
   const [loading, setLoading] = useState(true)
   const [source, setSource] = useState(null) // 'api' | 'mock'
+  const [showEditPanel, setShowEditPanel] = useState(false)
 
-  useEffect(() => {
+  const loadProject = useCallback(() => {
+    setLoading(true)
     // First try the real API
     getProject(id)
       .then(data => {
@@ -182,6 +185,8 @@ export default function ProjectDetail({ user, onLogout }) {
       })
       .finally(() => setLoading(false))
   }, [id])
+
+  useEffect(() => { loadProject() }, [loadProject])
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f2f5' }}>
@@ -233,6 +238,14 @@ export default function ProjectDetail({ user, onLogout }) {
             <span style={{ backgroundColor: '#f59e0b', color: 'white', fontSize: '11px', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
               DEMO DATA
             </span>
+          )}
+          {source === 'api' && (
+            <button
+              onClick={() => setShowEditPanel(true)}
+              style={{ backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+            >
+              ✏ Edit Project
+            </button>
           )}
           <span className="text-blue-200 text-sm">{user.name}</span>
           <button onClick={onLogout} className="bg-white text-sm font-medium px-4 py-1.5 rounded-full" style={{ color: '#1a2b4a' }}>Sign Out</button>
@@ -376,6 +389,16 @@ export default function ProjectDetail({ user, onLogout }) {
           </div>
         </div>
       </div>
+
+      {/* Edit Project Slide-Out Panel */}
+      {showEditPanel && project && (
+        <EditProjectPanel
+          project={project}
+          onClose={() => setShowEditPanel(false)}
+          onSaved={loadProject}
+        />
+      )}
+
     </div>
   )
 }
