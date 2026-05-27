@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getProjects } from '../api'
+import AddProjectPanel from '../components/AddProjectPanel'
 
 const PHASE_COLORS = {
   1: '#64748b', 2: '#3b82f6', 3: '#8b5cf6',
@@ -20,15 +21,19 @@ export default function Dashboard({ user, onLogout }) {
   const [search, setSearch] = useState('')
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showAddPanel, setShowAddPanel] = useState(false)
 
-  useEffect(() => {
+  const loadProjects = () => {
+    setLoading(true)
     getProjects()
       .then(data => {
         setProjects(Array.isArray(data) ? data : [])
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { loadProjects() }, [])
 
   const filters = ['All', 'On Track', 'At Risk', 'Overdue', 'Phase 1-3', 'Phase 4-6', 'Phase 7-9']
 
@@ -46,6 +51,7 @@ export default function Dashboard({ user, onLogout }) {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5' }}>
+
       {/* Header */}
       <div style={{ backgroundColor: '#1a2b4a', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
@@ -54,6 +60,12 @@ export default function Dashboard({ user, onLogout }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <span style={{ color: '#93c5fd', fontSize: '14px' }}>{user?.name} — {user?.role}</span>
+          <button
+            onClick={() => setShowAddPanel(true)}
+            style={{ backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
+          >
+            + Add Project
+          </button>
           <button onClick={onLogout} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer' }}>Logout</button>
         </div>
       </div>
@@ -68,6 +80,7 @@ export default function Dashboard({ user, onLogout }) {
 
       {/* Main Content */}
       <div style={{ padding: '24px' }}>
+
         {/* Search & Filters */}
         <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
           <input
@@ -91,7 +104,14 @@ export default function Dashboard({ user, onLogout }) {
           <div style={{ textAlign: 'center', padding: '60px', color: '#6b7280' }}>Loading projects...</div>
         ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px', color: '#6b7280' }}>
-            {projects.length === 0 ? 'No projects yet. Projects you add will appear here.' : 'No projects match your search.'}
+            {projects.length === 0
+              ? <div>
+                  <p style={{ fontSize: '16px', marginBottom: '12px' }}>No projects yet.</p>
+                  <button onClick={() => setShowAddPanel(true)} style={{ backgroundColor: '#1a2b4a', color: 'white', border: 'none', borderRadius: '6px', padding: '10px 20px', cursor: 'pointer', fontSize: '14px' }}>
+                    + Add Your First Project
+                  </button>
+                </div>
+              : 'No projects match your search.'}
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
@@ -103,9 +123,15 @@ export default function Dashboard({ user, onLogout }) {
                   <span style={{ fontSize: '12px', color: '#6b7280' }}>{project.number}</span>
                   <span style={{ fontSize: '12px', fontWeight: 'bold', color: STATUS_COLORS[project.status] }}>{project.status}</span>
                 </div>
-                <h3 style={{ margin: '0 0 12px', fontSize: '16px', color: '#1a2b4a' }}>{project.name}</h3>
+                <h3 style={{ margin: '0 0 4px', fontSize: '16px', color: '#1a2b4a' }}>{project.name}</h3>
+                {project.customer && (
+                  <p style={{ margin: '0 0 10px', fontSize: '12px', color: '#6b7280' }}>{project.customer}</p>
+                )}
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                   <span style={{ backgroundColor: PHASE_COLORS[project.phase], color: 'white', borderRadius: '4px', padding: '2px 8px', fontSize: '12px' }}>Phase {project.phase}</span>
+                  {project.sector && (
+                    <span style={{ backgroundColor: '#f1f5f9', color: '#475569', borderRadius: '4px', padding: '2px 8px', fontSize: '12px' }}>{project.sector}</span>
+                  )}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px', color: '#374151' }}>
                   <div>Contract: <strong>${(project.contractValue || 0).toLocaleString()}</strong></div>
@@ -118,6 +144,15 @@ export default function Dashboard({ user, onLogout }) {
           </div>
         )}
       </div>
+
+      {/* Add Project Slide-Out Panel */}
+      {showAddPanel && (
+        <AddProjectPanel
+          onClose={() => setShowAddPanel(false)}
+          onSaved={loadProjects}
+        />
+      )}
+
     </div>
   )
 }

@@ -121,6 +121,16 @@ const ROLE_COLORS = {
 
 // Normalize a project coming from MongoDB to match the shape the UI expects
 function normalizeApiProject(p) {
+  // Format dates from ISO (2025-03-03) to readable (Mar 3, 2025) if needed
+  const fmtDate = (d) => {
+    if (!d) return 'TBD'
+    if (d.includes('-') && d.length >= 10) {
+      const dt = new Date(d + 'T00:00:00')
+      return isNaN(dt) ? d : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    }
+    return d
+  }
+
   return {
     id: p._id,
     number: p.number || '',
@@ -128,18 +138,18 @@ function normalizeApiProject(p) {
     customer: p.customer || '',
     pm: p.pm || '',
     sector: p.sector || '',
+    union: p.union || '',
     phase: p.phase || 1,
-    status: p.status || 'on-track',
+    status: p.status || 'On Track',
     contractValue: p.contractValue != null ? `$${Number(p.contractValue).toLocaleString()}` : 'TBD',
-    daysInPhase: p.daysInPhase || 0,
     billingPct: p.billingPercent ?? p.billingPct ?? 0,
     sopComplete: p.sopComplete || 0,
-    union: p.union || '',
-    startDate: p.startDate || 'TBD',
-    completionDate: p.completionDate || 'TBD',
     openActionItems: p.openItems ?? p.openActionItems ?? 0,
     openRFIs: p.openRFIs || 0,
     openCOs: p.openCOs || 0,
+    daysInPhase: p.daysInPhase || 0,
+    startDate: fmtDate(p.startDate),
+    completionDate: fmtDate(p.completionDate),
   }
 }
 
