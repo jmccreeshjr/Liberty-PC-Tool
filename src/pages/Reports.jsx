@@ -343,7 +343,7 @@ export default function Reports() {
   // Role gate — PC and Executive only
   useEffect(() => {
     if (!user) { navigate('/login'); return }
-    if (!['PC', 'Executive'].includes(user.role)) {
+    if (!['PC', 'Project Coordinator', 'Executive'].includes(user.role)) {
       navigate('/')
     }
   }, [])

@@ -121,10 +121,16 @@ export default function Dashboard({ user, onLogout }) {
             📋 Inbox
           </button>
           {(user?.role === 'Project Coordinator' || user?.role === 'Executive') && (
-            <button onClick={() => navigate('/settings')}
-              style={{ backgroundColor: 'transparent', color: '#93c5fd', border: '1px solid rgba(147,197,253,0.4)', borderRadius: '6px', padding: '7px 14px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
-              ⚙️ Settings
-            </button>
+            <>
+              <button onClick={() => navigate('/reports')}
+                style={{ backgroundColor: 'transparent', color: '#93c5fd', border: '1px solid rgba(147,197,253,0.4)', borderRadius: '6px', padding: '7px 14px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
+                📊 Reports
+              </button>
+              <button onClick={() => navigate('/settings')}
+                style={{ backgroundColor: 'transparent', color: '#93c5fd', border: '1px solid rgba(147,197,253,0.4)', borderRadius: '6px', padding: '7px 14px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
+                ⚙️ Settings
+              </button>
+            </>
           )}
           <button onClick={() => setShowAddPanel(true)}
             style={{ backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
