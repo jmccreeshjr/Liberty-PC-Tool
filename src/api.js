@@ -99,3 +99,67 @@ export async function deleteActionItem(id) {
   })
   return res.json()
 }
+
+// ─── Alert Settings ───────────────────────────────────────────────────────────
+
+// Get global alert threshold settings
+export async function getAlertSettings() {
+  const res = await fetch(`${API_URL}/alert-settings`)
+  return res.json()
+}
+
+// Update global alert threshold settings
+export async function updateAlertSettings(data) {
+  const res = await fetch(`${API_URL}/alert-settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+// ─── Status Updates ───────────────────────────────────────────────────────────
+
+// Add a status update note to a project (note is required)
+// data: { note, author, role, status }
+export async function addStatusUpdate(projectId, data) {
+  const res = await fetch(`${API_URL}/projects/${projectId}/status-update`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+// ─── Alert Dismiss / Snooze ───────────────────────────────────────────────────
+
+// Permanently dismiss an alert type for a project
+export async function dismissAlert(projectId, alertType, dismissedBy) {
+  const res = await fetch(`${API_URL}/projects/${projectId}/alerts/dismiss`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alertType, dismissedBy }),
+  })
+  return res.json()
+}
+
+// Snooze an alert until a future date
+// snoozeUntil = ISO date string (e.g. new Date(Date.now() + 3 * 86400000).toISOString())
+export async function snoozeAlert(projectId, alertType, snoozedBy, snoozeUntil) {
+  const res = await fetch(`${API_URL}/projects/${projectId}/alerts/snooze`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alertType, snoozedBy, snoozeUntil }),
+  })
+  return res.json()
+}
+
+// Update per-project alert threshold overrides (null clears override → reverts to global)
+export async function updateProjectAlertOverrides(projectId, data) {
+  const res = await fetch(`${API_URL}/projects/${projectId}/alert-overrides`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}

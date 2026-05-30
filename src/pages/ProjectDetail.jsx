@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getProject, seedProjectTasks, updateTask, advancePhase, getProjectActionItems, createActionItem, updateActionItem, deleteActionItem } from '../api'
+import { getProject, seedProjectTasks, updateTask, advancePhase, getProjectActionItems, createActionItem, updateActionItem, deleteActionItem, addStatusUpdate, updateProjectAlertOverrides } from '../api'
 import EditProjectPanel from '../components/EditProjectPanel'
 
 const PHASES = [
@@ -114,6 +114,17 @@ export default function ProjectDetail({ user, onLogout }) {
     title: '', description: '', assignedTo: '', assignedRole: '', priority: 'Medium', dueDate: '',
   })
   const [actionSaving,    setActionSaving]    = useState(false)
+
+  // Status updates
+  const [showStatusForm,  setShowStatusForm]  = useState(false)
+  const [statusForm,      setStatusForm]      = useState({ note: '', status: '' })
+  const [statusSaving,    setStatusSaving]    = useState(false)
+
+  // Alert overrides (PC only)
+  const [showOverrides,   setShowOverrides]   = useState(false)
+  const [overrideForm,    setOverrideForm]    = useState({})
+  const [overrideSaving,  setOverrideSaving]  = useState(false)
+  const [overrideSaved,   setOverrideSaved]   = useState(false)
 
   // Which SOP roles this user can check off
   const canEditRoles = ROLE_PERMISSIONS[user?.role] || []
@@ -250,6 +261,53 @@ export default function ProjectDetail({ user, onLogout }) {
       console.error('Failed to delete action item', err)
     } finally {
       setDeletingAction(null)
+    }
+  }
+
+  const handleAddStatusUpdate = async (e) => {
+    e.preventDefault()
+    if (!statusForm.note.trim()) return
+    setStatusSaving(true)
+    try {
+      const updated = await addStatusUpdate(id, {
+        note:   statusForm.note.trim(),
+        author: user.name,
+        role:   user.role,
+        status: statusForm.status || project.status,
+      })
+      if (updated && updated._id) {
+        setProject(prev => ({
+          ...prev,
+          status:        updated.status,
+          statusUpdates: updated.statusUpdates,
+        }))
+      }
+      setStatusForm({ note: '', status: '' })
+      setShowStatusForm(false)
+    } catch (err) {
+      console.error('Failed to add status update', err)
+    } finally {
+      setStatusSaving(false)
+    }
+  }
+
+  const handleSaveOverrides = async (e) => {
+    e.preventDefault()
+    setOverrideSaving(true)
+    try {
+      const OVERRIDE_KEYS = ['phaseStuckDays', 'sopIncompleteDays', 'billingLagDays', 'openCODays', 'completionWarningDays', 'statusUpdateDays']
+      const payload = {}
+      OVERRIDE_KEYS.forEach(k => {
+        const v = overrideForm[k]
+        payload[k] = (v === '' || v === null || v === undefined) ? null : parseInt(v) || null
+      })
+      await updateProjectAlertOverrides(id, payload)
+      setOverrideSaved(true)
+      setTimeout(() => setOverrideSaved(false), 3000)
+    } catch (err) {
+      console.error('Failed to save overrides', err)
+    } finally {
+      setOverrideSaving(false)
     }
   }
 
@@ -725,6 +783,123 @@ export default function ProjectDetail({ user, onLogout }) {
                 ))}
               </div>
             </div>
+
+            {/* Status Updates */}
+            <div className="bg-white rounded-xl shadow-sm p-5">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <h3 className="font-bold text-gray-900">Status Updates</h3>
+                {source === 'api' && (
+                  <button onClick={() => { setShowStatusForm(v => !v); setStatusForm({ note: '', status: project.status }) }}
+                    style={{ fontSize: '11px', fontWeight: '600', color: '#1a2b4a', background: 'none', border: '1px solid #e5e7eb', borderRadius: '5px', padding: '3px 8px', cursor: 'pointer' }}>
+                    {showStatusForm ? 'Cancel' : '+ Add Update'}
+                  </button>
+                )}
+              </div>
+
+              {/* Add status update form */}
+              {showStatusForm && source === 'api' && (
+                <form onSubmit={handleAddStatusUpdate} style={{ backgroundColor: '#f8fafc', borderRadius: '8px', padding: '12px', marginBottom: '12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ marginBottom: '8px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '4px' }}>Status</label>
+                    <select value={statusForm.status || project.status} onChange={e => setStatusForm(f => ({ ...f, status: e.target.value }))}
+                      style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '5px', padding: '6px 8px', fontSize: '12px' }}>
+                      <option value="On Track">On Track</option>
+                      <option value="At Risk">At Risk</option>
+                      <option value="Overdue">Overdue</option>
+                    </select>
+                  </div>
+                  <div style={{ marginBottom: '8px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '4px' }}>
+                      Note <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <textarea
+                      required
+                      value={statusForm.note}
+                      onChange={e => setStatusForm(f => ({ ...f, note: e.target.value }))}
+                      placeholder="Describe what's happening with this project..."
+                      rows={3}
+                      style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '5px', padding: '6px 8px', fontSize: '12px', resize: 'vertical', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <button type="submit" disabled={statusSaving}
+                    style={{ width: '100%', padding: '7px', borderRadius: '5px', border: 'none', backgroundColor: '#1a2b4a', color: 'white', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                    {statusSaving ? 'Saving...' : 'Save Update'}
+                  </button>
+                </form>
+              )}
+
+              {/* Update log */}
+              {project.statusUpdates && project.statusUpdates.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {[...project.statusUpdates].reverse().slice(0, 5).map((upd, i) => (
+                    <div key={i} style={{ borderLeft: '2px solid #e5e7eb', paddingLeft: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '600', color: '#374151' }}>{upd.author}</span>
+                        <span style={{ fontSize: '10px', color: '#9ca3af' }}>·</span>
+                        <span style={{ fontSize: '10px', fontWeight: '600', padding: '1px 6px', borderRadius: '4px',
+                          backgroundColor: upd.status === 'On Track' ? '#dcfce7' : upd.status === 'At Risk' ? '#fef9c3' : '#fee2e2',
+                          color: upd.status === 'On Track' ? '#16a34a' : upd.status === 'At Risk' ? '#ca8a04' : '#dc2626' }}>
+                          {upd.status}
+                        </span>
+                        <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: 'auto' }}>
+                          {new Date(upd.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '12px', color: '#4b5563', margin: 0, lineHeight: 1.4 }}>{upd.note}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ fontSize: '12px', color: '#9ca3af', fontStyle: 'italic', margin: 0 }}>No status updates yet.</p>
+              )}
+            </div>
+
+            {/* Alert Overrides (PC only, API projects only) */}
+            {isPC && source === 'api' && (
+              <div className="bg-white rounded-xl shadow-sm p-5">
+                <button onClick={() => {
+                  setShowOverrides(v => !v)
+                  if (!showOverrides) {
+                    const KEYS = ['phaseStuckDays','sopIncompleteDays','billingLagDays','openCODays','completionWarningDays','statusUpdateDays']
+                    const f = {}
+                    KEYS.forEach(k => { f[k] = project.alertOverrides?.[k] ?? '' })
+                    setOverrideForm(f)
+                  }
+                }} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  <h3 className="font-bold text-gray-900">Alert Thresholds</h3>
+                  <span style={{ fontSize: '11px', color: '#6b7280' }}>{showOverrides ? '▲' : '▼'}</span>
+                </button>
+                {showOverrides && (
+                  <form onSubmit={handleSaveOverrides} style={{ marginTop: '12px' }}>
+                    <p style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '10px' }}>Leave blank to use global defaults.</p>
+                    {[
+                      { key: 'phaseStuckDays',        label: 'Phase Stuck (days)'       },
+                      { key: 'sopIncompleteDays',     label: 'SOP Incomplete (days)'    },
+                      { key: 'billingLagDays',        label: 'Billing Lag (days)'       },
+                      { key: 'openCODays',            label: 'Open COs (days)'          },
+                      { key: 'completionWarningDays', label: 'Completion Warning (days)' },
+                      { key: 'statusUpdateDays',      label: 'Status Update (days)'     },
+                    ].map(({ key, label }) => (
+                      <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <label style={{ fontSize: '11px', color: '#374151' }}>{label}</label>
+                        <input type="number" min="1" placeholder="Global"
+                          value={overrideForm[key] ?? ''}
+                          onChange={e => setOverrideForm(f => ({ ...f, [key]: e.target.value }))}
+                          style={{ width: '64px', border: '1px solid #d1d5db', borderRadius: '5px', padding: '4px 6px', fontSize: '12px', textAlign: 'center' }}
+                        />
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+                      <button type="submit" disabled={overrideSaving}
+                        style={{ flex: 1, padding: '7px', borderRadius: '5px', border: 'none', backgroundColor: '#1a2b4a', color: 'white', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                        {overrideSaving ? 'Saving...' : 'Save Overrides'}
+                      </button>
+                      {overrideSaved && <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: '600' }}>✓</span>}
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
 
           </div>
         </div>

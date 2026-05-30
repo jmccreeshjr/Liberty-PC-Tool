@@ -9,11 +9,13 @@ const PORT = process.env.PORT || 5000
 app.use(cors())
 app.use(express.json())
 
-const projectRoutes    = require('./routes/projects')
-const actionItemRoutes = require('./routes/actionItems')
+const projectRoutes      = require('./routes/projects')
+const actionItemRoutes   = require('./routes/actionItems')
+const alertSettingsRoutes = require('./routes/alertSettings')
 
-app.use('/api/projects',     projectRoutes)
-app.use('/api/action-items', actionItemRoutes)
+app.use('/api/projects',       projectRoutes)
+app.use('/api/action-items',   actionItemRoutes)
+app.use('/api/alert-settings', alertSettingsRoutes)
 
 app.get('/', (req, res) => {
   res.send('Liberty PC Tool API is running')
