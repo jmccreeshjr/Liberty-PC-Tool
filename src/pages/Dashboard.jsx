@@ -58,15 +58,21 @@ export default function Dashboard({ user, onLogout }) {
           <h1 style={{ color: 'white', fontSize: '22px', fontWeight: 'bold', margin: 0 }}>Liberty PC Lifecycle Board</h1>
           <p style={{ color: '#93c5fd', fontSize: '13px', margin: 0 }}>Liberty Integrated Solutions</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ color: '#93c5fd', fontSize: '14px' }}>{user?.name} — {user?.role}</span>
+          <button
+            onClick={() => navigate('/inbox')}
+            style={{ backgroundColor: 'transparent', color: '#93c5fd', border: '1px solid rgba(147,197,253,0.4)', borderRadius: '6px', padding: '7px 14px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}
+          >
+            📋 Inbox
+          </button>
           <button
             onClick={() => setShowAddPanel(true)}
             style={{ backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
           >
             + Add Project
           </button>
-          <button onClick={onLogout} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer' }}>Logout</button>
+          <button onClick={onLogout} style={{ backgroundColor: 'white', color: '#1a2b4a', border: 'none', borderRadius: '20px', padding: '6px 16px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>Sign Out</button>
         </div>
       </div>
 

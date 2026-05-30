@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getProject, seedProjectTasks, updateTask, advancePhase } from '../api'
+import { getProject, seedProjectTasks, updateTask, advancePhase, getProjectActionItems, createActionItem, updateActionItem, deleteActionItem } from '../api'
 import EditProjectPanel from '../components/EditProjectPanel'
 
 const PHASES = [
@@ -103,6 +103,18 @@ export default function ProjectDetail({ user, onLogout }) {
   const [advanceError,  setAdvanceError]  = useState('')
   const [togglingTask,  setTogglingTask]  = useState(null) // taskId being saved
 
+  // Action Items tab
+  const [activeTab,       setActiveTab]       = useState('sop') // 'sop' | 'actions'
+  const [actionItems,     setActionItems]     = useState([])
+  const [actionsLoading,  setActionsLoading]  = useState(false)
+  const [showActionForm,  setShowActionForm]  = useState(false)
+  const [updatingAction,  setUpdatingAction]  = useState(null)
+  const [deletingAction,  setDeletingAction]  = useState(null)
+  const [actionForm,      setActionForm]      = useState({
+    title: '', description: '', assignedTo: '', assignedRole: '', priority: 'Medium', dueDate: '',
+  })
+  const [actionSaving,    setActionSaving]    = useState(false)
+
   // Which SOP roles this user can check off
   const canEditRoles = ROLE_PERMISSIONS[user?.role] || []
   const isReadOnly   = canEditRoles.length === 0
@@ -175,6 +187,69 @@ export default function ProjectDetail({ user, onLogout }) {
       setAdvanceError('Failed to advance phase. Please try again.')
     } finally {
       setAdvancing(false)
+    }
+  }
+
+  // Load action items when switching to Actions tab (API projects only)
+  const loadActionItems = useCallback(() => {
+    if (source !== 'api') return
+    setActionsLoading(true)
+    getProjectActionItems(id)
+      .then(data => setActionItems(Array.isArray(data) ? data : []))
+      .catch(() => setActionItems([]))
+      .finally(() => setActionsLoading(false))
+  }, [id, source])
+
+  useEffect(() => {
+    if (activeTab === 'actions' && source === 'api') loadActionItems()
+  }, [activeTab, source, loadActionItems])
+
+  const handleCreateAction = async (e) => {
+    e.preventDefault()
+    if (!actionForm.title.trim()) return
+    setActionSaving(true)
+    try {
+      const payload = {
+        ...actionForm,
+        projectId:     id,
+        projectName:   project?.name   || '',
+        projectNumber: project?.number || '',
+        createdBy:     user.name,
+        dueDate:       actionForm.dueDate || null,
+      }
+      const created = await createActionItem(payload)
+      setActionItems(prev => [created, ...prev])
+      setActionForm({ title: '', description: '', assignedTo: '', assignedRole: '', priority: 'Medium', dueDate: '' })
+      setShowActionForm(false)
+    } catch (err) {
+      console.error('Failed to create action item', err)
+    } finally {
+      setActionSaving(false)
+    }
+  }
+
+  const handleActionStatusChange = async (item, newStatus) => {
+    setUpdatingAction(item._id)
+    try {
+      const updated = await updateActionItem(item._id, { status: newStatus })
+      setActionItems(prev => prev.map(i => i._id === item._id ? updated : i))
+    } catch (err) {
+      console.error('Failed to update action item', err)
+    } finally {
+      setUpdatingAction(null)
+    }
+  }
+
+  const handleDeleteAction = async (item) => {
+    if (!window.confirm(`Delete "${item.title}"?`)) return
+    setDeletingAction(item._id)
+    try {
+      await deleteActionItem(item._id)
+      setActionItems(prev => prev.filter(i => i._id !== item._id))
+    } catch (err) {
+      console.error('Failed to delete action item', err)
+    } finally {
+      setDeletingAction(null)
     }
   }
 
@@ -306,109 +381,292 @@ export default function ProjectDetail({ user, onLogout }) {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-          {/* SOP Checklist */}
-          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="font-bold text-gray-900 text-lg">Phase {project.phase} SOP Checklist</h2>
-                <p className="text-sm text-gray-500">{phase.name}</p>
-                {isReadOnly && (
-                  <span style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>Read-only view</span>
-                )}
-                {!isReadOnly && source === 'api' && (
-                  <span style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>
-                    You can check off <strong>{canEditRoles.join(', ')}</strong> tasks
-                  </span>
-                )}
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold" style={{ color: phase.color }}>{displayDone}/{displayTasks.length}</div>
-                <div className="text-xs text-gray-400">steps complete</div>
-              </div>
+          {/* Main Panel — SOP Checklist + Action Items Tabs */}
+          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm">
+
+            {/* Tab Bar */}
+            <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', padding: '0 24px' }}>
+              {[
+                { key: 'sop',     label: `Phase ${project.phase} SOP Checklist` },
+                { key: 'actions', label: `Action Items${actionItems.length > 0 ? ` (${actionItems.filter(i => i.status === 'Open' || i.status === 'In Progress').length} open)` : ''}` },
+              ].map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  style={{
+                    padding: '14px 16px', fontSize: '13px', fontWeight: '600', border: 'none', background: 'none', cursor: 'pointer',
+                    borderBottom: activeTab === tab.key ? `2px solid ${phase.color}` : '2px solid transparent',
+                    color: activeTab === tab.key ? phase.color : '#6b7280',
+                    marginBottom: '-1px',
+                  }}>
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
-            {/* Progress bar */}
-            <div className="w-full bg-gray-100 rounded-full h-2 mb-5">
-              <div className="h-2 rounded-full transition-all" style={{ width: `${displayTasks.length > 0 ? (displayDone / displayTasks.length) * 100 : 0}%`, backgroundColor: phase.color }} />
-            </div>
+            <div style={{ padding: '24px' }}>
 
-            {/* Phase Advance (PC only, API projects only) */}
-            {isPC && source === 'api' && project.phase < 9 && (
-              <div style={{ marginBottom: '16px', padding: '12px 14px', borderRadius: '8px', backgroundColor: allRequiredDone ? '#f0fdf4' : '#fafafa', border: `1px solid ${allRequiredDone ? '#bbf7d0' : '#e5e7eb'}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                  <div>
-                    <p style={{ fontSize: '13px', fontWeight: '600', color: allRequiredDone ? '#16a34a' : '#374151', margin: 0 }}>
-                      {allRequiredDone ? '✅ All required tasks complete — ready to advance' : `⏳ ${requiredTasks.filter(t => !t.done).length} required task(s) remaining before phase advance`}
-                    </p>
-                    {advanceError && <p style={{ fontSize: '12px', color: '#dc2626', margin: '4px 0 0' }}>{advanceError}</p>}
-                  </div>
-                  <button
-                    onClick={handleAdvancePhase}
-                    disabled={!allRequiredDone || advancing}
-                    style={{
-                      padding: '8px 16px', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: '600', cursor: allRequiredDone && !advancing ? 'pointer' : 'not-allowed',
-                      backgroundColor: allRequiredDone ? '#1a2b4a' : '#e5e7eb',
-                      color: allRequiredDone ? 'white' : '#9ca3af',
-                    }}
-                  >
-                    {advancing ? 'Advancing...' : `Advance to Phase ${project.phase + 1} →`}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Task list */}
-            <div className="space-y-3">
-              {displayTasks.map(task => {
-                const roleStyle   = ROLE_COLORS[task.role] || { bg: '#f1f5f9', text: '#475569' }
-                const canCheck    = source === 'api' && canEditRoles.includes(task.role)
-                const isToggling  = togglingTask === task.id
-                const isOptional  = task.required === false
-
-                return (
-                  <div
-                    key={task.id}
-                    onClick={() => canCheck && !isToggling && handleToggleTask(task)}
-                    style={{
-                      display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '10px 12px', borderRadius: '8px',
-                      backgroundColor: task.done ? '#f0fdf4' : '#fafafa',
-                      border: `1px solid ${task.done ? '#bbf7d0' : '#e5e7eb'}`,
-                      cursor: canCheck ? 'pointer' : 'default',
-                      opacity: isToggling ? 0.6 : 1,
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {/* Checkbox */}
-                    <div style={{
-                      marginTop: '1px', width: '20px', height: '20px', borderRadius: '50%', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      backgroundColor: task.done ? '#16a34a' : canCheck ? 'white' : '#e5e7eb',
-                      border: canCheck && !task.done ? '2px solid #d1d5db' : 'none',
-                    }}>
-                      {task.done && <span style={{ color: 'white', fontSize: '11px', fontWeight: 'bold' }}>✓</span>}
-                      {isToggling && <span style={{ fontSize: '10px' }}>⋯</span>}
-                    </div>
-
-                    {/* Task text + attribution */}
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: '13px', margin: 0, textDecoration: task.done ? 'line-through' : 'none', color: task.done ? '#9ca3af' : '#1f2937' }}>
-                        {task.task}
-                        {isOptional && <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '6px' }}>(optional)</span>}
-                      </p>
-                      {task.done && task.completedBy && (
-                        <p style={{ fontSize: '11px', color: '#6b7280', margin: '2px 0 0' }}>
-                          ✓ {task.completedBy}{task.completedAt ? ` · ${new Date(task.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
-                        </p>
+              {/* ── SOP Checklist Tab ── */}
+              {activeTab === 'sop' && (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="font-bold text-gray-900 text-lg">Phase {project.phase} — {phase.name}</h2>
+                      {isReadOnly && (
+                        <span style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>Read-only view</span>
+                      )}
+                      {!isReadOnly && source === 'api' && (
+                        <span style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>
+                          You can check off <strong>{canEditRoles.join(', ')}</strong> tasks
+                        </span>
                       )}
                     </div>
-
-                    {/* Role badge */}
-                    <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '999px', flexShrink: 0, backgroundColor: roleStyle.bg, color: roleStyle.text }}>
-                      {task.role}
-                    </span>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold" style={{ color: phase.color }}>{displayDone}/{displayTasks.length}</div>
+                      <div className="text-xs text-gray-400">steps complete</div>
+                    </div>
                   </div>
-                )
-              })}
+
+                  {/* Progress bar */}
+                  <div className="w-full bg-gray-100 rounded-full h-2 mb-5">
+                    <div className="h-2 rounded-full transition-all" style={{ width: `${displayTasks.length > 0 ? (displayDone / displayTasks.length) * 100 : 0}%`, backgroundColor: phase.color }} />
+                  </div>
+
+                  {/* Phase Advance (PC only, API projects only) */}
+                  {isPC && source === 'api' && project.phase < 9 && (
+                    <div style={{ marginBottom: '16px', padding: '12px 14px', borderRadius: '8px', backgroundColor: allRequiredDone ? '#f0fdf4' : '#fafafa', border: `1px solid ${allRequiredDone ? '#bbf7d0' : '#e5e7eb'}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                        <div>
+                          <p style={{ fontSize: '13px', fontWeight: '600', color: allRequiredDone ? '#16a34a' : '#374151', margin: 0 }}>
+                            {allRequiredDone ? '✅ All required tasks complete — ready to advance' : `⏳ ${requiredTasks.filter(t => !t.done).length} required task(s) remaining before phase advance`}
+                          </p>
+                          {advanceError && <p style={{ fontSize: '12px', color: '#dc2626', margin: '4px 0 0' }}>{advanceError}</p>}
+                        </div>
+                        <button
+                          onClick={handleAdvancePhase}
+                          disabled={!allRequiredDone || advancing}
+                          style={{
+                            padding: '8px 16px', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: '600', cursor: allRequiredDone && !advancing ? 'pointer' : 'not-allowed',
+                            backgroundColor: allRequiredDone ? '#1a2b4a' : '#e5e7eb',
+                            color: allRequiredDone ? 'white' : '#9ca3af',
+                          }}
+                        >
+                          {advancing ? 'Advancing...' : `Advance to Phase ${project.phase + 1} →`}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Task list */}
+                  <div className="space-y-3">
+                    {displayTasks.map(task => {
+                      const roleStyle  = ROLE_COLORS[task.role] || { bg: '#f1f5f9', text: '#475569' }
+                      const canCheck   = source === 'api' && canEditRoles.includes(task.role)
+                      const isToggling = togglingTask === task.id
+                      const isOptional = task.required === false
+
+                      return (
+                        <div
+                          key={task.id}
+                          onClick={() => canCheck && !isToggling && handleToggleTask(task)}
+                          style={{
+                            display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '10px 12px', borderRadius: '8px',
+                            backgroundColor: task.done ? '#f0fdf4' : '#fafafa',
+                            border: `1px solid ${task.done ? '#bbf7d0' : '#e5e7eb'}`,
+                            cursor: canCheck ? 'pointer' : 'default',
+                            opacity: isToggling ? 0.6 : 1,
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          <div style={{
+                            marginTop: '1px', width: '20px', height: '20px', borderRadius: '50%', flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            backgroundColor: task.done ? '#16a34a' : canCheck ? 'white' : '#e5e7eb',
+                            border: canCheck && !task.done ? '2px solid #d1d5db' : 'none',
+                          }}>
+                            {task.done && <span style={{ color: 'white', fontSize: '11px', fontWeight: 'bold' }}>✓</span>}
+                            {isToggling && <span style={{ fontSize: '10px' }}>⋯</span>}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontSize: '13px', margin: 0, textDecoration: task.done ? 'line-through' : 'none', color: task.done ? '#9ca3af' : '#1f2937' }}>
+                              {task.task}
+                              {isOptional && <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '6px' }}>(optional)</span>}
+                            </p>
+                            {task.done && task.completedBy && (
+                              <p style={{ fontSize: '11px', color: '#6b7280', margin: '2px 0 0' }}>
+                                ✓ {task.completedBy}{task.completedAt ? ` · ${new Date(task.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                              </p>
+                            )}
+                          </div>
+                          <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '999px', flexShrink: 0, backgroundColor: roleStyle.bg, color: roleStyle.text }}>
+                            {task.role}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* ── Action Items Tab ── */}
+              {activeTab === 'actions' && (
+                <>
+                  {/* Header row */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#111827' }}>Action Items</h2>
+                      <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>{project.name}</p>
+                    </div>
+                    {isPC && source === 'api' && (
+                      <button
+                        onClick={() => setShowActionForm(v => !v)}
+                        style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#1a2b4a', color: 'white', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                        {showActionForm ? '✕ Cancel' : '+ New Action Item'}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Create form (PC only) */}
+                  {showActionForm && isPC && source === 'api' && (
+                    <form onSubmit={handleCreateAction} style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '4px' }}>Title *</label>
+                          <input
+                            required value={actionForm.title}
+                            onChange={e => setActionForm(f => ({ ...f, title: e.target.value }))}
+                            placeholder="What needs to be done?"
+                            style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '4px' }}>Description</label>
+                          <textarea
+                            value={actionForm.description}
+                            onChange={e => setActionForm(f => ({ ...f, description: e.target.value }))}
+                            placeholder="Additional details..."
+                            rows={2}
+                            style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', resize: 'vertical', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '4px' }}>Assigned To</label>
+                          <input
+                            value={actionForm.assignedTo}
+                            onChange={e => setActionForm(f => ({ ...f, assignedTo: e.target.value }))}
+                            placeholder="Person's name"
+                            style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '4px' }}>Role</label>
+                          <select
+                            value={actionForm.assignedRole}
+                            onChange={e => setActionForm(f => ({ ...f, assignedRole: e.target.value }))}
+                            style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', boxSizing: 'border-box' }}>
+                            <option value="">— Select role —</option>
+                            {['Project Coordinator','Project Manager','Estimator','Foreman','Accounting','Purchasing','Safety','Executive'].map(r => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '4px' }}>Priority</label>
+                          <select
+                            value={actionForm.priority}
+                            onChange={e => setActionForm(f => ({ ...f, priority: e.target.value }))}
+                            style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', boxSizing: 'border-box' }}>
+                            {['Low','Medium','High','Critical'].map(p => <option key={p} value={p}>{p}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '4px' }}>Due Date</label>
+                          <input
+                            type="date"
+                            value={actionForm.dueDate}
+                            onChange={e => setActionForm(f => ({ ...f, dueDate: e.target.value }))}
+                            style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <button type="button" onClick={() => setShowActionForm(false)}
+                          style={{ padding: '8px 14px', borderRadius: '6px', border: '1px solid #d1d5db', backgroundColor: 'white', fontSize: '13px', cursor: 'pointer' }}>
+                          Cancel
+                        </button>
+                        <button type="submit" disabled={actionSaving}
+                          style={{ padding: '8px 14px', borderRadius: '6px', border: 'none', backgroundColor: '#1a2b4a', color: 'white', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                          {actionSaving ? 'Saving...' : 'Create Action Item'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* Action items list */}
+                  {actionsLoading ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280', fontSize: '14px' }}>Loading...</div>
+                  ) : actionItems.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
+                      <div style={{ fontSize: '28px', marginBottom: '8px' }}>📋</div>
+                      <p style={{ fontSize: '14px', margin: 0 }}>No action items yet{source === 'mock' ? ' (demo project)' : ''}.</p>
+                      {isPC && source === 'api' && !showActionForm && (
+                        <button onClick={() => setShowActionForm(true)}
+                          style={{ marginTop: '12px', padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#1a2b4a', color: 'white', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                          + Create First Action Item
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {actionItems.map(item => {
+                        const priorityCfg = { Low: { bg: '#f1f5f9', text: '#64748b' }, Medium: { bg: '#dbeafe', text: '#1d4ed8' }, High: { bg: '#fef9c3', text: '#ca8a04' }, Critical: { bg: '#fee2e2', text: '#dc2626' } }[item.priority] || { bg: '#f1f5f9', text: '#64748b' }
+                        const statusCfg   = { Open: { bg: '#fee2e2', text: '#dc2626' }, 'In Progress': { bg: '#fef9c3', text: '#ca8a04' }, Resolved: { bg: '#dcfce7', text: '#16a34a' }, Closed: { bg: '#f1f5f9', text: '#6b7280' } }[item.status] || { bg: '#f1f5f9', text: '#6b7280' }
+                        const overdue     = item.dueDate && new Date(item.dueDate) < new Date() && item.status !== 'Resolved' && item.status !== 'Closed'
+                        const isUpdating  = updatingAction === item._id
+                        const isDeleting  = deletingAction === item._id
+
+                        return (
+                          <div key={item._id} style={{
+                            backgroundColor: '#fafafa', borderRadius: '8px', padding: '12px 14px',
+                            border: `1px solid ${overdue ? '#fca5a5' : '#e5e7eb'}`,
+                            opacity: isDeleting ? 0.4 : 1, transition: 'opacity 0.2s',
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
+                              <div style={{ flex: 1, minWidth: '180px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937' }}>{item.title}</span>
+                                  <span style={{ fontSize: '11px', fontWeight: '600', padding: '1px 7px', borderRadius: '999px', backgroundColor: priorityCfg.bg, color: priorityCfg.text }}>{item.priority}</span>
+                                  {overdue && <span style={{ fontSize: '11px', fontWeight: '600', padding: '1px 7px', borderRadius: '999px', backgroundColor: '#fee2e2', color: '#dc2626' }}>OVERDUE</span>}
+                                </div>
+                                {item.description && <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>{item.description}</p>}
+                                <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: '#9ca3af', flexWrap: 'wrap' }}>
+                                  {item.assignedTo && <span>👤 {item.assignedTo}</span>}
+                                  {item.dueDate    && <span style={{ color: overdue ? '#dc2626' : '#9ca3af' }}>📅 {new Date(item.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                                  <span>By {item.createdBy}</span>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                <select
+                                  value={item.status}
+                                  onChange={e => handleActionStatusChange(item, e.target.value)}
+                                  disabled={isUpdating}
+                                  style={{ fontSize: '11px', fontWeight: '600', padding: '3px 8px', borderRadius: '6px', border: 'none', cursor: 'pointer', backgroundColor: statusCfg.bg, color: statusCfg.text, appearance: 'none' }}>
+                                  {['Open','In Progress','Resolved','Closed'].map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                                {isPC && (
+                                  <button onClick={() => handleDeleteAction(item)} disabled={isDeleting}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '14px', lineHeight: 1 }} title="Delete">✕</button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+
             </div>
           </div>
 
@@ -450,8 +708,13 @@ export default function ProjectDetail({ user, onLogout }) {
             <div className="bg-white rounded-xl shadow-sm p-5">
               <h3 className="font-bold text-gray-900 mb-3">Quick Actions</h3>
               <div className="space-y-2">
+                <button
+                  onClick={() => { setActiveTab('actions'); setShowActionForm(true) }}
+                  className="w-full text-left text-xs font-medium px-3 py-2 rounded-lg border transition hover:opacity-80"
+                  style={{ borderColor: '#1a2b4a', color: '#1a2b4a' }}>
+                  + Create Action Item
+                </button>
                 {[
-                  { label: '+ Create Action Item',   color: '#1a2b4a' },
                   { label: '↗ Open OneDrive Folder', color: '#0369a1' },
                   { label: '↗ Open in Procore',      color: '#ea580c' },
                 ].map(({ label, color }) => (

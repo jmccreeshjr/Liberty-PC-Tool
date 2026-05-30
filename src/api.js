@@ -56,3 +56,46 @@ export async function advancePhase(projectId) {
   })
   return res.json()
 }
+
+// ─── Action Items ─────────────────────────────────────────────────────────────
+
+// Get all action items — optional filters: { assignedTo, projectId, status }
+export async function getActionItems(filters = {}) {
+  const params = new URLSearchParams(filters).toString()
+  const res = await fetch(`${API_URL}/action-items${params ? `?${params}` : ''}`)
+  return res.json()
+}
+
+// Get all action items for a specific project
+export async function getProjectActionItems(projectId) {
+  const res = await fetch(`${API_URL}/action-items/project/${projectId}`)
+  return res.json()
+}
+
+// Create a new action item
+export async function createActionItem(data) {
+  const res = await fetch(`${API_URL}/action-items`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+// Update an action item (status, fields, etc.)
+export async function updateActionItem(id, data) {
+  const res = await fetch(`${API_URL}/action-items/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+// Delete an action item (PC only — enforced client-side)
+export async function deleteActionItem(id) {
+  const res = await fetch(`${API_URL}/action-items/${id}`, {
+    method: 'DELETE',
+  })
+  return res.json()
+}
