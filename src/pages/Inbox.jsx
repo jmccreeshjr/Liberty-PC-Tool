@@ -33,11 +33,13 @@ export default function Inbox({ user, onLogout }) {
   const navigate = useNavigate()
   const isManager = user?.role === 'Project Coordinator' || user?.role === 'Executive'
 
-  const [items,        setItems]        = useState([])
-  const [loading,      setLoading]      = useState(true)
-  const [statusFilter, setStatusFilter] = useState('Active') // 'Active' | 'All' | specific status
-  const [updatingId,   setUpdatingId]   = useState(null)
-  const [deletingId,   setDeletingId]   = useState(null)
+  const [items,          setItems]          = useState([])
+  const [loading,        setLoading]        = useState(true)
+  const [statusFilter,   setStatusFilter]   = useState('Active') // 'Active' | 'All' | specific status
+  const [projectSearch,  setProjectSearch]  = useState('')
+  const [assigneeSearch, setAssigneeSearch] = useState('')
+  const [updatingId,     setUpdatingId]     = useState(null)
+  const [deletingId,     setDeletingId]     = useState(null)
 
   const loadItems = () => {
     setLoading(true)
@@ -78,11 +80,30 @@ export default function Inbox({ user, onLogout }) {
     }
   }
 
+  // Unique assignee list for datalist suggestions (PC only)
+  const assigneeOptions = [...new Set(items.map(i => i.assignedTo).filter(Boolean))].sort()
+
+  // Fuzzy-ish match helper — checks if every word in the query appears in the target
+  const fuzzyMatch = (query, target) => {
+    if (!query.trim()) return true
+    const q = query.toLowerCase()
+    const t = (target || '').toLowerCase()
+    // Simple substring match — good enough for names and project titles
+    return q.split(/\s+/).every(word => t.includes(word))
+  }
+
   // Filter items
   const displayItems = items.filter(item => {
-    if (statusFilter === 'Active') return item.status === 'Open' || item.status === 'In Progress'
-    if (statusFilter === 'All') return true
-    return item.status === statusFilter
+    const matchStatus = statusFilter === 'Active'
+      ? item.status === 'Open' || item.status === 'In Progress'
+      : statusFilter === 'All' ? true
+      : item.status === statusFilter
+
+    const projectLabel = `${item.projectNumber || ''} ${item.projectName || ''}`
+    const matchProject  = fuzzyMatch(projectSearch,  projectLabel)
+    const matchAssignee = fuzzyMatch(assigneeSearch, item.assignedTo)
+
+    return matchStatus && matchProject && matchAssignee
   })
 
   // Group by project
@@ -138,7 +159,47 @@ export default function Inbox({ user, onLogout }) {
 
       <div style={{ padding: '24px', maxWidth: '900px', margin: '0 auto' }}>
 
-        {/* Filter Tabs */}
+        {/* Search Bar (PC / Executive only) */}
+        {isManager && (
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
+              <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: '14px', pointerEvents: 'none' }}>🔍</span>
+              <input
+                value={projectSearch}
+                onChange={e => setProjectSearch(e.target.value)}
+                placeholder="Search by project name or number..."
+                style={{ width: '100%', paddingLeft: '32px', paddingRight: projectSearch ? '30px' : '12px', paddingTop: '8px', paddingBottom: '8px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', backgroundColor: 'white', boxSizing: 'border-box', outline: 'none' }}
+              />
+              {projectSearch && (
+                <button onClick={() => setProjectSearch('')} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '16px', lineHeight: 1 }}>✕</button>
+              )}
+            </div>
+            <div style={{ position: 'relative', flex: '1', minWidth: '180px' }}>
+              <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: '14px', pointerEvents: 'none' }}>👤</span>
+              <input
+                list="assignee-options"
+                value={assigneeSearch}
+                onChange={e => setAssigneeSearch(e.target.value)}
+                placeholder="Search by assignee..."
+                style={{ width: '100%', paddingLeft: '32px', paddingRight: assigneeSearch ? '30px' : '12px', paddingTop: '8px', paddingBottom: '8px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', backgroundColor: 'white', boxSizing: 'border-box', outline: 'none' }}
+              />
+              {assigneeSearch && (
+                <button onClick={() => setAssigneeSearch('')} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '16px', lineHeight: 1 }}>✕</button>
+              )}
+              <datalist id="assignee-options">
+                {assigneeOptions.map(name => <option key={name} value={name} />)}
+              </datalist>
+            </div>
+            {(projectSearch || assigneeSearch) && (
+              <button onClick={() => { setProjectSearch(''); setAssigneeSearch('') }}
+                style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: 'white', fontSize: '13px', color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                Clear filters
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Status Filter Tabs */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
           {['Active', 'All', 'Open', 'In Progress', 'Resolved', 'Closed'].map(f => (
             <button key={f} onClick={() => setStatusFilter(f)}
@@ -157,8 +218,16 @@ export default function Inbox({ user, onLogout }) {
           <div style={{ textAlign: 'center', padding: '60px', color: '#6b7280' }}>Loading action items...</div>
         ) : displayItems.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px', color: '#6b7280' }}>
-            <div style={{ fontSize: '32px', marginBottom: '12px' }}>✅</div>
-            <p style={{ fontSize: '16px' }}>{items.length === 0 ? 'No action items yet.' : 'No items match this filter.'}</p>
+            <div style={{ fontSize: '32px', marginBottom: '12px' }}>{items.length === 0 ? '✅' : '🔍'}</div>
+            <p style={{ fontSize: '16px', margin: '0 0 8px' }}>
+              {items.length === 0 ? 'No action items yet.' : 'No items match your search.'}
+            </p>
+            {(projectSearch || assigneeSearch) && (
+              <button onClick={() => { setProjectSearch(''); setAssigneeSearch('') }}
+                style={{ fontSize: '13px', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                Clear search filters
+              </button>
+            )}
           </div>
         ) : (
           Object.values(grouped).map(group => (
@@ -195,7 +264,7 @@ export default function Inbox({ user, onLogout }) {
 
                         {/* Main content */}
                         <div style={{ flex: 1, minWidth: '200px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>{item.title}</span>
                             <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '999px', backgroundColor: priorityCfg.bg, color: priorityCfg.text }}>
                               {item.priority}
@@ -206,13 +275,22 @@ export default function Inbox({ user, onLogout }) {
                               </span>
                             )}
                           </div>
+
+                          {/* Assigned-to pill — prominent, always visible when set */}
+                          {item.assignedTo && (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '3px 10px', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '12px' }}>👤</span>
+                              <span style={{ fontSize: '12px', fontWeight: '600', color: '#1d4ed8' }}>{item.assignedTo}</span>
+                              {item.assignedRole && <span style={{ fontSize: '11px', color: '#60a5fa' }}>· {item.assignedRole}</span>}
+                            </div>
+                          )}
+
                           {item.description && (
                             <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 6px' }}>{item.description}</p>
                           )}
                           <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#9ca3af', flexWrap: 'wrap' }}>
-                            {item.assignedTo && <span>👤 {item.assignedTo}</span>}
-                            {item.dueDate    && <span style={{ color: overdue ? '#dc2626' : '#9ca3af' }}>📅 Due {fmtDate(item.dueDate)}</span>}
-                            {item.createdBy  && <span>Created by {item.createdBy}</span>}
+                            {item.dueDate   && <span style={{ color: overdue ? '#dc2626' : '#9ca3af' }}>📅 Due {fmtDate(item.dueDate)}</span>}
+                            {item.createdBy && <span>Created by {item.createdBy}</span>}
                           </div>
                         </div>
 
