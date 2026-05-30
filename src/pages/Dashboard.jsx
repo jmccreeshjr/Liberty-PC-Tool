@@ -306,6 +306,14 @@ export default function Dashboard({ user, onLogout }) {
                     <div>SOP: <strong>{project.sopComplete || 0}%</strong></div>
                     <div>Open Items: <strong>{project.openItems || 0}</strong></div>
                   </div>
+                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '12px', color: '#9ca3af' }}>
+                    {(() => {
+                      const days = project.phaseStartDate
+                        ? Math.floor((Date.now() - new Date(project.phaseStartDate).getTime()) / (1000 * 60 * 60 * 24))
+                        : (project.daysInPhase || 0)
+                      return `${days} day${days !== 1 ? 's' : ''} in Phase ${project.phase}`
+                    })()}
+                  </div>
                 </div>
               )
             })}

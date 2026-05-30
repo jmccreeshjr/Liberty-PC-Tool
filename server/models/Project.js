@@ -15,11 +15,12 @@ const projectSchema = new mongoose.Schema({
   openItems:      Number,
   openRFIs:       Number,
   openCOs:        Number,
-  daysInPhase:    Number,
+  daysInPhase:    Number,   // legacy — kept for backward compat, no longer used for alerts
   startDate:      String,
   completionDate: String,
 
   // Phase 5 — alert engine timestamps
+  phaseStartDate:     { type: Date,    default: null  },  // set on create + each phase advance; source of truth for daysInPhase
   phaseReady:         { type: Boolean, default: false },  // true when all required tasks for current phase are done
   lastBillingUpdate:  { type: Date,    default: null  },  // set when billingPercent changes
   lastStatusUpdate:   { type: Date,    default: null  },  // set when a status note is added

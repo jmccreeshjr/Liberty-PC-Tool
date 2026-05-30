@@ -3,11 +3,24 @@ const router = express.Router()
 const Project = require('../models/Project')
 const { getAllTasks, getRequiredTasksForPhase } = require('../sopTasks')
 
+// Helper — compute live daysInPhase from phaseStartDate
+function computeDaysInPhase(project) {
+  const start = project.phaseStartDate || project.createdAt
+  if (!start) return project.daysInPhase || 0
+  return Math.floor((Date.now() - new Date(start).getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function withLiveDays(project) {
+  const obj = project.toObject ? project.toObject() : { ...project }
+  obj.daysInPhase = computeDaysInPhase(project)
+  return obj
+}
+
 // GET all projects
 router.get('/', async (req, res) => {
   try {
     const projects = await Project.find()
-    res.json(projects)
+    res.json(projects.map(withLiveDays))
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
@@ -18,7 +31,7 @@ router.get('/:id', async (req, res) => {
   try {
     const project = await Project.findById(req.params.id)
     if (!project) return res.status(404).json({ message: 'Project not found' })
-    res.json(project)
+    res.json(withLiveDays(project))
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
@@ -32,6 +45,7 @@ router.post('/', async (req, res) => {
       projectData.sopTasks = getAllTasks()
     }
     // Set initial timestamps
+    projectData.phaseStartDate    = new Date()
     projectData.lastBillingUpdate = new Date()
     projectData.lastStatusUpdate  = new Date()
     projectData.lastCOUpdate      = new Date()
@@ -132,10 +146,11 @@ router.patch('/:id/advance', async (req, res) => {
       })
     }
 
-    project.phase      = project.phase + 1
-    project.sopComplete = 0
-    project.phaseReady  = false
-    project.daysInPhase = 0
+    project.phase          = project.phase + 1
+    project.sopComplete    = 0
+    project.phaseReady     = false
+    project.daysInPhase    = 0
+    project.phaseStartDate = new Date()   // reset the clock for the new phase
 
     // Recalculate sopComplete for the new phase
     const newPhaseTasks     = project.sopTasks.filter(t => t.phase === project.phase)
@@ -247,7 +262,7 @@ router.patch('/:id/alert-overrides', async (req, res) => {
     })
     project.markModified('alertOverrides')
     await project.save()
-    res.json(project)
+    res.json(withLiveDays(project))
   } catch (err) {
     res.status(400).json({ message: err.message })
   }

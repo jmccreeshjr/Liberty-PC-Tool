@@ -68,16 +68,21 @@ export function evaluateAlerts(projects = [], globalSettings = {}, actionItemsBy
       })
     }
 
+    // Live days in current phase — computed from phaseStartDate (falls back to daysInPhase for legacy projects)
+    const daysInPhase = project.phaseStartDate
+      ? Math.floor((now.getTime() - new Date(project.phaseStartDate).getTime()) / (1000 * 60 * 60 * 24))
+      : (project.daysInPhase || 0)
+
     // ── #1  Phase stuck ──────────────────────────────────────────────────────
-    if ((project.daysInPhase || 0) > settings.phaseStuckDays) {
+    if (daysInPhase > settings.phaseStuckDays) {
       push('phaseStuck',
-        `In Phase ${project.phase} for ${project.daysInPhase} days (threshold: ${settings.phaseStuckDays})`)
+        `In Phase ${project.phase} for ${daysInPhase} day${daysInPhase !== 1 ? 's' : ''} (threshold: ${settings.phaseStuckDays})`)
     }
 
     // ── #2  Required SOP tasks incomplete ───────────────────────────────────
-    if ((project.daysInPhase || 0) > settings.sopIncompleteDays && (project.sopComplete || 0) < 100) {
+    if (daysInPhase > settings.sopIncompleteDays && (project.sopComplete || 0) < 100) {
       push('sopIncomplete',
-        `Phase ${project.phase} SOP tasks incomplete after ${project.daysInPhase} days (threshold: ${settings.sopIncompleteDays})`)
+        `Phase ${project.phase} SOP tasks incomplete after ${daysInPhase} day${daysInPhase !== 1 ? 's' : ''} (threshold: ${settings.sopIncompleteDays})`)
     }
 
     // ── #3  Phase ready — immediate ──────────────────────────────────────────
