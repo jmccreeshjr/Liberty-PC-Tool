@@ -82,19 +82,77 @@ router.patch('/:id', async (req, res) => {
   }
 })
 
-// PATCH seed SOP tasks into an existing project that has none
+// Helper — merge master task list into a project's sopTasks, preserving done states.
+// Adds any missing tasks; updates task text + required flag on existing ones.
+// Tasks in phases the project has already passed are auto-marked complete.
+function resyncSopTasks(project) {
+  const master = getAllTasks()
+  const existingMap = {}
+  for (const t of (project.sopTasks || [])) {
+    existingMap[t.id] = t
+  }
+  project.sopTasks = master.map(masterTask => {
+    const existing = existingMap[masterTask.id]
+    const alreadyPassed = project.phase > masterTask.phase
+    if (existing) {
+      // Update mutable fields from master; preserve done state
+      existing.task     = masterTask.task
+      existing.required = masterTask.required
+      existing.role     = masterTask.role
+      if (alreadyPassed && !existing.done) {
+        existing.done        = true
+        existing.completedBy = 'system (phase advance)'
+        existing.completedAt = new Date()
+      }
+      return existing
+    } else {
+      // New task — auto-complete if project has already passed this phase
+      return {
+        ...masterTask,
+        done:        alreadyPassed,
+        completedBy: alreadyPassed ? 'system (phase advance)' : null,
+        completedAt: alreadyPassed ? new Date() : null,
+      }
+    }
+  })
+  // Recalculate sopComplete and phaseReady for the current phase
+  const phaseTasks     = project.sopTasks.filter(t => t.phase === project.phase)
+  const donePhaseTasks = phaseTasks.filter(t => t.done)
+  project.sopComplete  = phaseTasks.length > 0
+    ? Math.round((donePhaseTasks.length / phaseTasks.length) * 100)
+    : 0
+  const requiredTasks = phaseTasks.filter(t => t.required)
+  project.phaseReady  = requiredTasks.length > 0 && requiredTasks.every(t => t.done)
+}
+
+// PATCH resync SOP tasks for a single project against the current master definition.
+// Safe to call repeatedly — preserves existing done states, adds missing tasks,
+// updates task text/required flags, auto-completes tasks in already-passed phases.
 router.patch('/:id/seed-tasks', async (req, res) => {
   try {
     const project = await Project.findById(req.params.id)
     if (!project) return res.status(404).json({ message: 'Project not found' })
-    if (project.sopTasks && project.sopTasks.length > 0) {
-      return res.json(project)
-    }
-    project.sopTasks = getAllTasks()
+    resyncSopTasks(project)
     await project.save()
-    res.json(project)
+    res.json(withLiveDays(project))
   } catch (err) {
     res.status(400).json({ message: err.message })
+  }
+})
+
+// POST resync SOP tasks for ALL projects — call once after updating sopTasks.js
+router.post('/resync-all-tasks', async (req, res) => {
+  try {
+    const projects = await Project.find()
+    let updated = 0
+    for (const project of projects) {
+      resyncSopTasks(project)
+      await project.save()
+      updated++
+    }
+    res.json({ message: `Resynced SOP tasks for ${updated} project(s).` })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
   }
 })
 
