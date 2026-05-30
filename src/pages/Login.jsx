@@ -2,8 +2,25 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const USERS = [
-  { username: 'jmccreesh', password: 'liberty2026', name: 'Joe McCreesh', role: 'Project Coordinator' },
-  { username: 'admin', password: 'admin', name: 'Admin User', role: 'Executive' },
+  // Project Coordinator
+  { username: 'jmccreesh',    password: 'liberty2026', name: 'Joe McCreesh',       role: 'Project Coordinator' },
+  // Executive
+  { username: 'admin',        password: 'admin',        name: 'Admin User',         role: 'Executive' },
+  // Project Managers
+  { username: 'jodriscoll',   password: 'liberty2026', name: "Jim O'Driscoll",     role: 'Project Manager' },
+  { username: 'dcovelens',    password: 'liberty2026', name: 'Damion Covelens',    role: 'Project Manager' },
+  { username: 'bfischer',     password: 'liberty2026', name: 'Brian Fischer',      role: 'Project Manager' },
+  { username: 'rreichenbach', password: 'liberty2026', name: 'Ray Reichenbach',    role: 'Project Manager' },
+  // Estimator
+  { username: 'estimator1',   password: 'liberty2026', name: 'Lead Estimator',     role: 'Estimator' },
+  // Foreman
+  { username: 'foreman1',     password: 'liberty2026', name: 'Field Foreman',      role: 'Foreman' },
+  // Accounting
+  { username: 'accounting1',  password: 'liberty2026', name: 'Accounting Staff',   role: 'Accounting' },
+  // Purchasing
+  { username: 'purchasing1',  password: 'liberty2026', name: 'Purchasing Staff',   role: 'Purchasing' },
+  // Safety
+  { username: 'safety1',      password: 'liberty2026', name: 'Safety Manager',     role: 'Safety' },
 ]
 
 export default function Login({ onLogin }) {
