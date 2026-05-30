@@ -12,10 +12,12 @@ app.use(express.json())
 const projectRoutes      = require('./routes/projects')
 const actionItemRoutes   = require('./routes/actionItems')
 const alertSettingsRoutes = require('./routes/alertSettings')
+const sopTemplateRoutes   = require('./routes/sopTemplate')
 
 app.use('/api/projects',       projectRoutes)
 app.use('/api/action-items',   actionItemRoutes)
 app.use('/api/alert-settings', alertSettingsRoutes)
+app.use('/api/sop-template',   sopTemplateRoutes)
 
 app.get('/', (req, res) => {
   res.send('Liberty PC Tool API is running')

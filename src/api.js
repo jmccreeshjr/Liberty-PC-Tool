@@ -163,3 +163,71 @@ export async function updateProjectAlertOverrides(projectId, data) {
   })
   return res.json()
 }
+
+// Resync SOP tasks for a single project against current master
+export async function resyncProjectTasks(projectId) {
+  const res = await fetch(`${API_URL}/projects/${projectId}/seed-tasks`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+  })
+  return res.json()
+}
+
+// Resync SOP tasks for all projects at once (server-side bulk operation)
+export async function resyncAllProjectTasks() {
+  const res = await fetch(`${API_URL}/projects/resync-all-tasks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+  return res.json()
+}
+
+// ─── SOP Template (Governance) ────────────────────────────────────────────────
+
+// Get all SOP template tasks
+export async function getSopTemplate(userRole) {
+  const res = await fetch(`${API_URL}/sop-template`, {
+    headers: { 'x-user-role': userRole || '' },
+  })
+  return res.json()
+}
+
+// Add a new SOP task to the template (and propagate to all projects)
+// data: { phase, role, task, required, addedBy }
+export async function addSopTemplateTask(data, userRole) {
+  const res = await fetch(`${API_URL}/sop-template`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-user-role': userRole || '' },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+// Edit a SOP template task
+// data: any subset of { role, task, required, order }
+export async function updateSopTemplateTask(taskId, data, userRole) {
+  const res = await fetch(`${API_URL}/sop-template/${taskId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'x-user-role': userRole || '' },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+// Delete a SOP template task (removes from all projects too)
+export async function deleteSopTemplateTask(taskId, userRole) {
+  const res = await fetch(`${API_URL}/sop-template/${taskId}`, {
+    method: 'DELETE',
+    headers: { 'x-user-role': userRole || '' },
+  })
+  return res.json()
+}
+
+// Push full SOP template to all projects (resync everything)
+export async function resyncAllFromTemplate(userRole) {
+  const res = await fetch(`${API_URL}/sop-template/resync-all`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-user-role': userRole || '' },
+  })
+  return res.json()
+}

@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard'
 import ProjectDetail from './pages/ProjectDetail'
 import Inbox from './pages/Inbox'
 import Settings from './pages/Settings'
+import Reports        from './pages/Reports'
+import SopGovernance  from './pages/SopGovernance'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -17,6 +19,8 @@ function App() {
         <Route path="/project/:id" element={user ? <ProjectDetail user={user} onLogout={() => setUser(null)} /> : <Navigate to="/login" />} />
         <Route path="/inbox"     element={user ? <Inbox       user={user} onLogout={() => setUser(null)} /> : <Navigate to="/login" />} />
         <Route path="/settings"  element={user ? <Settings    user={user} onLogout={() => setUser(null)} /> : <Navigate to="/login" />} />
+        <Route path="/reports"   element={user ? <Reports        user={user} onLogout={() => setUser(null)} /> : <Navigate to="/login" />} />
+        <Route path="/sop-governance" element={user ? <SopGovernance user={user} onLogout={() => setUser(null)} /> : <Navigate to="/login" />} />
         <Route path="*"          element={<Navigate to={user ? '/dashboard' : '/login'} />} />
       </Routes>
     </BrowserRouter>

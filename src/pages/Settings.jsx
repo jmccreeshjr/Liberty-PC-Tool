@@ -138,6 +138,7 @@ export default function Settings({ user, onLogout }) {
           {[
             { key: 'global',   label: '🌐 Global Defaults'        },
             { key: 'projects', label: '📁 Per-Project Overrides'  },
+            { key: 'sop',      label: '📋 SOP Governance'         },
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               style={{
@@ -269,6 +270,23 @@ export default function Settings({ user, onLogout }) {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── SOP Governance Tab ── */}
+        {activeTab === 'sop' && (
+          <div style={{ textAlign: 'center', paddingTop: '32px' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📋</div>
+            <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>SOP Task Governance</h2>
+            <p style={{ fontSize: '14px', color: '#64748b', maxWidth: '460px', margin: '0 auto 24px' }}>
+              Manage the master SOP task library. Add, edit, or remove tasks — changes automatically apply to all projects.
+              Tasks in phases a project has already passed are auto-marked complete.
+            </p>
+            <button
+              onClick={() => navigate('/sop-governance')}
+              style={{ background: '#1e3a5f', color: 'white', border: 'none', padding: '12px 28px', borderRadius: '8px', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>
+              Open SOP Governance →
+            </button>
           </div>
         )}
 
