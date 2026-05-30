@@ -331,9 +331,8 @@ function FinancialReport({ projects }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-export default function Reports() {
+export default function Reports({ user }) {
   const navigate  = useNavigate()
-  const user      = JSON.parse(localStorage.getItem('user') || 'null')
   const [projects, setProjects]     = useState([])
   const [loading,  setLoading]      = useState(true)
   const [error,    setError]        = useState(null)
@@ -344,7 +343,7 @@ export default function Reports() {
   useEffect(() => {
     if (!user) { navigate('/login'); return }
     if (!['PC', 'Project Coordinator', 'Executive'].includes(user.role)) {
-      navigate('/')
+      navigate('/dashboard')
     }
   }, [])
 

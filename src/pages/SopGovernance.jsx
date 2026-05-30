@@ -181,9 +181,8 @@ function TaskRow({ task, userRole, onUpdated, onDeleted }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-export default function SopGovernance() {
+export default function SopGovernance({ user }) {
   const navigate   = useNavigate()
-  const user       = JSON.parse(localStorage.getItem('user') || 'null')
   const userRole   = user?.role || ''
 
   const [tasks,       setTasks]       = useState([])
